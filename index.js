@@ -4,48 +4,91 @@ const bodyParser = require('body-parser');
 const { spawn } = require('child_process');
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-const port = 2222;
+const port = 2223;
 
 var relays = {};
 var relay_processes = {};
 
 function start_process(id,source,target) {
 
+	console.log('start streamlink');
+
 	relays[id]={source:source,target:target};
+	if(! relay_processes[id]) relay_processes[id]={};
 
 	var process_sl = spawn('/usr/local/bin/streamlink',[source,'best','-O']);
-	var process_fm = spawn('ffmpeg',['-hide_banner','-re','-i','pipe:0','-c:v','copy','-c:a','copy','-bsf:a','aac_adtstoasc','-strict','-2','-f','flv',target]);
 	
-	relay_processes[id]={streamlink:process_sl,ffmpeg:process_fm};
+	if(! relay_processes[id].ffmpeg)
+		start_fm_process(id,target);
 	
+	relay_processes[id].streamlink = process_sl;
+
 	process_sl.stdout.on('data', (data) => {
-		process_fm.stdin.write(data);
+		try {
+			if(relay_processes[id].ffmpeg && relay_processes[id].ffmpeg.stdin.writable)
+				relay_processes[id].ffmpeg.stdin.write(data);
+		} catch (err) {
+			console.log('pipe error: '+err);
+		}
 	});
 	process_sl.on('close', (code) => {
 		if (code !== 0) {
 			console.log(`streamlink process exited with code ${code}`);
+		}else{
+			console.log(`streamlink process exited clean`);
 		}
-		process_fm.stdin.end();
+		try {
+			relay_processes[id].ffmpeg.stdin.end();
+		} catch (err) {
+			console.log('pipe end error: '+err);
+		}
 		if(relays[id]) {
-			console.log('restart');
+			console.log('restart streamlink');
 			start_process(id,source,target);
 		}
 	});
 	process_sl.stderr.on('data', (data) => {
-		console.error(`sl stderr: ${data}`);
+		console.log(`sl stderr: ${data}`);
+	});
+	process_sl.on('error', (err) => {
+		console.log('streamlink errored. '+err);
+	});
+}
+
+function start_fm_process(id,target) {
+	
+	console.log('start ffmpeg');
+
+	var process_fm = spawn('ffmpeg',['-hide_banner','-re','-i','pipe:0','-c:v','copy','-c:a','copy','-bsf:a','aac_adtstoasc','-strict','-2','-f','flv',target]);
+	
+	relay_processes[id].ffmpeg = process_fm;
+
+	process_fm.stdin.on('error', () => {
+		console.log(`ffmpeg pipe error`);
+	});
+
+	process_fm.on('close', (code) => {
+		relay_processes[id].ffmpeg = null;
+		if (code !== 0) {
+			console.log(`ffmpeg process exited with code ${code}`);
+		}else{
+			console.log(`ffmpeg process exited clean`);
+		}
+		if(relays[id]) {
+			console.log('restart ffmpeg');
+			start_fm_process(id,target);
+		}
 	});
 	process_fm.stderr.on('data', (data) => {
-		console.error(`fm stderr: ${data}`);
+		//console.error(`fm stderr: ${data}`);
 		if(relays[id]) relays[id].ffmpeg=data.toString();
 	});
 	process_fm.stdout.on('data', (data) => {
-		console.error(`fm stdout: ${data}`);
-	});
-	process_sl.on('error', (err) => {
-		console.error('streamlink errored. '+err);
+		console.log(`fm stdout: ${data}`);
 	});
 	process_fm.on('error', (err) => {
-		console.error('ffmpeg errored. '+err);
+		relay_processes[id].ffmpeg = null;
+		console.log('ffmpeg errored. '+err);
 	});
 }
 
