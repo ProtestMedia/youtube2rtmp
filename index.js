@@ -26,6 +26,10 @@ function start_process(id,source,target) {
 			console.log(`streamlink process exited with code ${code}`);
 		}
 		process_fm.stdin.end();
+		if(relays[id]) {
+			console.log('restart');
+			start_process(id,source,target);
+		}
 	});
 	process_sl.stderr.on('data', (data) => {
 		console.error(`sl stderr: ${data}`);
@@ -38,10 +42,10 @@ function start_process(id,source,target) {
 		console.error(`fm stdout: ${data}`);
 	});
 	process_sl.on('error', (err) => {
-		console.error('streamlink errored.');
+		console.error('streamlink errored. '+err);
 	});
 	process_fm.on('error', (err) => {
-		console.error('ffmpeg errored.');
+		console.error('ffmpeg errored. '+err);
 	});
 }
 
