@@ -4,7 +4,7 @@ const bodyParser = require('body-parser');
 const { spawn } = require('child_process');
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-const port = 2223;
+const port = 2222;
 
 var relays = {};
 var relay_processes = {};
@@ -16,7 +16,7 @@ function start_process(id,source,target) {
 	relays[id]={source:source,target:target};
 	if(! relay_processes[id]) relay_processes[id]={};
 
-	var process_sl = spawn('/usr/local/bin/streamlink',[source,'best','-O']);
+	var process_sl = spawn('/usr/local/bin/streamlink',[source,'720p,480p,360p,240p','-O']);
 	
 	if(! relay_processes[id].ffmpeg)
 		start_fm_process(id,target);
@@ -59,8 +59,7 @@ function start_fm_process(id,target) {
 	
 	console.log('start ffmpeg');
 
-	var process_fm = spawn('ffmpeg',['-hide_banner','-re','-i','pipe:0','-c:v','copy','-c:a','copy','-bsf:a','aac_adtstoasc','-strict','-2','-f','flv',target]);
-	
+	var process_fm = spawn('ffmpeg',['-hide_banner','-re','-i','pipe:0','-c:v','libx264','-c:a','aac','-maxrate','2800k','-bufsize','3000k','-b:a','128k','-bf','2','-s','1280x720','-preset','veryfast','-crf','23','-x264-params','keyint=60:no-scenecut=1','-strict','-2','-f','flv',target]);
 	relay_processes[id].ffmpeg = process_fm;
 
 	process_fm.stdin.on('error', () => {
