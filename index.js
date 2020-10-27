@@ -5,6 +5,13 @@ const { spawn } = require('child_process');
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 const port = 2222;
+const io = require('@pm2/io')
+
+const activeGrabs = io.metric({
+	name: 'active grabs',
+})
+activeGrabs.set(0);
+
 
 var relays = {};
 var relay_processes = {};
@@ -15,6 +22,8 @@ function start_process(id,source,target) {
 
 	relays[id]={source:source,target:target};
 	if(! relay_processes[id]) relay_processes[id]={};
+
+	activeGrabs.set(Object.keys(relays).length);
 
 	var process_sl = spawn('/usr/local/bin/streamlink',[source,'720p,480p,360p,240p','-O']);
 	
@@ -57,9 +66,12 @@ function start_process(id,source,target) {
 
 function start_fm_process(id,target) {
 	
-	console.log('start ffmpeg');
 
-	var process_fm = spawn('ffmpeg',['-hide_banner','-re','-i','pipe:0','-c:v','libx264','-c:a','aac','-maxrate','2800k','-bufsize','3000k','-b:a','128k','-bf','2','-s','1280x720','-preset','veryfast','-crf','23','-x264-params','keyint=60:no-scenecut=1','-strict','-2','-f','flv',target]);
+	const cmdline = '-init_hw_device qsv=hw -hwaccel qsv -hide_banner -re -c:v h264_qsv -c:a libfdk_aac -i pipe:0 -g 60 -c:v h264_qsv -c:a libfdk_aac -b:v 2800k -maxrate 2800k -bufsize 3000k -b:a 128k -bf 2 -preset fast -strict -2 -f flv '+target
+	
+	console.log('start ffmpeg '+cmdline);
+
+	var process_fm = spawn('ffmpeg',cmdline.split(' '));
 	relay_processes[id].ffmpeg = process_fm;
 
 	process_fm.stdin.on('error', () => {
@@ -107,6 +119,7 @@ app.post('/add_relay', (req, res) => {
 app.post('/delete_relay', (req, res) => {
 	delete(relays[req.body.id]);
 	relay_processes[req.body.id].streamlink.kill('SIGKILL');
+	activeGrabs.set(Object.keys(relays).length);
 	res.send('ok');
 });
 
