@@ -19,6 +19,22 @@
 						"style":"margin-top:30px",
 						html: items.join( "" )
 					}).appendTo( "body" );
+					
+					$.getJSON( "/relay_state_fb", function( data ) {
+					
+						var items=[];
+						$.each( data, function( i ) {
+							items.push( "<tr><td>"+ data[i].source+"</td><td>"+ data[i].target+"</td><td>"+ data[i].ffmpeg+"</td><td><input type=\"submit\" value=\"delete\" onclick=\"delete_relay_fb('"+i+"')\"/></td></tr>");
+						});
+						
+						$("#relays_fb").remove();
+						$( "<table/>", {
+							"id":"relays_fb",
+							"style":"margin-top:30px",
+							html: items.join( "" )
+						}).appendTo( "body" );
+
+					});
 
 				});
 			}
@@ -26,8 +42,8 @@
 			function add_relay() {
 				
 				$.post( "/add_relay",{source:$("#source").val(),target:$("#target").val()}, function() {
-					$("#source").val('');
-					$("#target").val('');
+					//$("#source").val('');
+					//$("#target").val('');
 					update_relays();
 				});	
 				
@@ -35,6 +51,23 @@
 			function delete_relay(id) {
 				
 				$.post( "/delete_relay",{"id":id}, function() {
+					update_relays();
+				});	
+				
+			}
+
+			function add_relay_fb() {
+				
+				$.post( "/add_relay_fb",{source:$("#source_fb").val(),target:$("#target_fb").val()}, function() {
+					//$("#source").val('');
+					//$("#target").val('');
+					update_relays();
+				});	
+				
+			}
+			function delete_relay_fb(id) {
+				
+				$.post( "/delete_relay_fb",{"id":id}, function() {
 					update_relays();
 				});	
 				
@@ -64,7 +97,10 @@
 		<div>
 			youtube-source: <input type="text" id="source" style="width:300px"/><br/>
 			rtmp-target: <input type="text"  style="width:300px" id="target"/><br/>
-			<input type="submit" value="add" onclick="add_relay()"/>
+			<input type="submit" value="add" onclick="add_relay()"/><br/>
+			facebook-source: <input type="text" id="source_fb" style="width:300px"/><br/>
+			rtmp-target: <input type="text"  style="width:300px" id="target_fb"/><br/>
+			<input type="submit" value="add" onclick="add_relay_fb()"/>
 		</div>
 	</body>
 </html>
